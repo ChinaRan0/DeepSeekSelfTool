@@ -398,21 +398,23 @@ class TranslationThread(QThread):
         except Exception as e:
             self.translation_complete.emit(f"翻译错误: {str(e)}")
 
-
 class SourceCodeAuditThread(QThread):
     audit_complete = pyqtSignal(str)
     progress_updated = pyqtSignal(int)
 
-    def __init__(self, files, parent=None):  # 修改构造函数
-        super().__init__(parent)  # 调用父类构造函数
-        self.files = files  # 保存文件列表
+    def __init__(self, files, parent=None):
+        super().__init__(parent)
+        self.files = files
+
     def run(self):
-        audit_results = []
         total_files = len(self.files)
+        total_steps = total_files + 2  # 总步骤 = 文件数 + 2
+        audit_results = []
         
+        # ================= 阶段1：处理所有文件 =================
         for i, file_path in enumerate(self.files):
             try:
-                # 文件读取异常处理
+                # 文件读取
                 try:
                     with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                         content = f.read()
@@ -420,10 +422,12 @@ class SourceCodeAuditThread(QThread):
                     audit_results.append(f"【文件读取失败】{os.path.basename(file_path)}\n错误原因：{str(e)}")
                     continue
 
-                # 进度更新（不受后续处理影响）
-                self.progress_updated.emit(int((i+1)/total_files*100))
+                # 更新进度（每个文件占1步）
+                current_step = i + 1
+                progress = int( (current_step / total_steps) * 100 )
+                self.progress_updated.emit(progress)
 
-                # API请求异常处理
+                # API请求
                 try:
                     headers = {
                         "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
@@ -439,10 +443,10 @@ class SourceCodeAuditThread(QThread):
    - 位置行号: 
    - 修复建议: 
 4.如果不存在漏洞，则不输出
-5.忽略API请求失败
+5.忽略API请求失败,不输出
 文件内容：
-{content[:3000]}"""
-                    
+{content[:3000]}"""  # 限制每个文件内容长度
+
                     payload = {
                         "model": "deepseek-chat",
                         "messages": [{"role": "user", "content": prompt}],
@@ -477,13 +481,16 @@ class SourceCodeAuditThread(QThread):
                     f"错误详情：{str(e)}"
                 )
 
-        # 最终结果处理（保护汇总阶段）
+        # ================= 阶段2：结果汇总 =================
         try:
+            # 更新进度到 N+1 步（汇总开始）
+            self.progress_updated.emit( int( (total_files + 1) / total_steps * 100 ) )
+            
+            # 生成汇总结果
             if len(audit_results) == 0:
                 final_result = "⚠️ 所有文件处理均失败，请检查网络连接和API密钥"
             else:
                 audit_results_str = '\n'.join(audit_results)
-
                 final_prompt = f"""请综合以下审计结果，按危险等级分类整理：
 {audit_results_str}
 
@@ -491,8 +498,8 @@ class SourceCodeAuditThread(QThread):
 1. 按【高危】【中危】【低危】三级分类
 2. 每个漏洞注明文件名和行号
 3. 同类漏洞合并显示
-4. 使用精简的Markdown格式"""
-                
+4. 不使用markdown格式，直接输出文本"""
+
                 payload = {
                     "model": "deepseek-chat",
                     "messages": [{"role": "user", "content": final_prompt}],
@@ -516,7 +523,10 @@ class SourceCodeAuditThread(QThread):
                 + f"\n\n汇总错误：{str(e)}"
             )
 
-        self.audit_complete.emit(final_result)
+        # ================= 阶段3：最终提交 =================
+        # 强制进度到100%后才发送结果
+        self.progress_updated.emit(100)  # 最后一步
+        self.audit_complete.emit(final_result)  # 此时必定100%
 
 class CyberSecurityApp(QMainWindow):
     def __init__(self):
@@ -1098,7 +1108,7 @@ class CyberSecurityApp(QMainWindow):
             return
 
         self.btn_audit.setEnabled(False)
-        self.audit_result.setPlainText("开始审计（到达100%后请等待最后一个文件完成）...")
+        self.audit_result.setPlainText("开始审计...")
 
         self.audit_thread = SourceCodeAuditThread(self.audit_files, self)  # 添加 self 作为 parent
         self.audit_thread.audit_complete.connect(self.show_audit_result)
