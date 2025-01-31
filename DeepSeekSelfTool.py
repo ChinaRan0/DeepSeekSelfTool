@@ -1098,7 +1098,7 @@ class CyberSecurityApp(QMainWindow):
             return
 
         self.btn_audit.setEnabled(False)
-        self.audit_result.setPlainText("开始审计...")
+        self.audit_result.setPlainText("开始审计（到达100%后请等待最后一个文件完成）...")
 
         self.audit_thread = SourceCodeAuditThread(self.audit_files, self)  # 添加 self 作为 parent
         self.audit_thread.audit_complete.connect(self.show_audit_result)
