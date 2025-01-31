@@ -4,10 +4,11 @@ import json
 import requests
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QTextEdit, QPushButton, QLabel, QHBoxLayout,
-                             QSplitter, QScrollArea, QTabWidget, QFrame, QSizePolicy,QComboBox)
+                             QSplitter, QScrollArea, QTabWidget, QFrame,QCheckBox ,QSizePolicy,QComboBox,QFileDialog,QProgressBar)
 from PyQt5.QtCore import Qt, QSize, QThread, pyqtSignal
 from PyQt5.QtGui import QFont, QColor, QPalette, QLinearGradient
 import config
+import glob
 # 配置参数（需要用户自行修改）
 DEEPSEEK_API_KEY = config.DEEPSEEK_API_KEY
 API_ENDPOINT = "https://api.deepseek.com/v1/chat/completions"
@@ -397,6 +398,126 @@ class TranslationThread(QThread):
         except Exception as e:
             self.translation_complete.emit(f"翻译错误: {str(e)}")
 
+
+class SourceCodeAuditThread(QThread):
+    audit_complete = pyqtSignal(str)
+    progress_updated = pyqtSignal(int)
+
+    def __init__(self, files, parent=None):  # 修改构造函数
+        super().__init__(parent)  # 调用父类构造函数
+        self.files = files  # 保存文件列表
+    def run(self):
+        audit_results = []
+        total_files = len(self.files)
+        
+        for i, file_path in enumerate(self.files):
+            try:
+                # 文件读取异常处理
+                try:
+                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        content = f.read()
+                except Exception as e:
+                    audit_results.append(f"【文件读取失败】{os.path.basename(file_path)}\n错误原因：{str(e)}")
+                    continue
+
+                # 进度更新（不受后续处理影响）
+                self.progress_updated.emit(int((i+1)/total_files*100))
+
+                # API请求异常处理
+                try:
+                    headers = {
+                        "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+                        "Content-Type": "application/json"
+                    }
+
+                    prompt = f"""请对以下代码文件进行安全审计，要求：
+1. 识别SQL注入、XSS、文件包含、命令执行等漏洞
+2. 检查不安全的权限设置和敏感信息泄露
+3. 输出格式：【文件名】{os.path.basename(file_path)}
+   - 漏洞类型: 
+   - 危险等级: 
+   - 位置行号: 
+   - 修复建议: 
+4.如果不存在漏洞，则不输出
+5.忽略API请求失败
+文件内容：
+{content[:3000]}"""
+                    
+                    payload = {
+                        "model": "deepseek-chat",
+                        "messages": [{"role": "user", "content": prompt}],
+                        "temperature": 0.3
+                    }
+
+                    response = requests.post(API_ENDPOINT, 
+                                          headers=headers, 
+                                          json=payload,
+                                          timeout=30)  # 增加超时设置
+                    response.raise_for_status()
+                    
+                    result = response.json()['choices'][0]['message']['content']
+                    audit_results.append(result)
+
+                except requests.exceptions.RequestException as e:
+                    audit_results.append(
+                        f"【API请求失败】{os.path.basename(file_path)}\n"
+                        f"错误类型：{type(e).__name__}\n"
+                        f"错误详情：{str(e)}"
+                    )
+                except KeyError as e:
+                    audit_results.append(
+                        f"【响应解析失败】{os.path.basename(file_path)}\n"
+                        f"错误字段：{str(e)}"
+                    )
+
+            except Exception as e:  # 全局异常兜底
+                audit_results.append(
+                    f"【未知错误】{os.path.basename(file_path)}\n"
+                    f"错误类型：{type(e).__name__}\n"
+                    f"错误详情：{str(e)}"
+                )
+
+        # 最终结果处理（保护汇总阶段）
+        try:
+            if len(audit_results) == 0:
+                final_result = "⚠️ 所有文件处理均失败，请检查网络连接和API密钥"
+            else:
+                audit_results_str = '\n'.join(audit_results)
+
+                final_prompt = f"""请综合以下审计结果，按危险等级分类整理：
+{audit_results_str}
+
+要求：
+1. 按【高危】【中危】【低危】三级分类
+2. 每个漏洞注明文件名和行号
+3. 同类漏洞合并显示
+4. 使用精简的Markdown格式"""
+                
+                payload = {
+                    "model": "deepseek-chat",
+                    "messages": [{"role": "user", "content": final_prompt}],
+                    "temperature": 0.3
+                }
+
+                response = requests.post(API_ENDPOINT, 
+                                      headers=headers, 
+                                      json=payload,
+                                      timeout=60)
+                response.raise_for_status()
+                final_result = response.json()['choices'][0]['message']['content']
+                
+                # 添加原始数据备份
+                final_result += "\n\n--- 原始数据备份 ---\n" + "\n".join(audit_results)
+
+        except Exception as e:
+            final_result = (
+                "⚠️ 汇总阶段失败，以下是各文件独立分析结果：\n\n" 
+                + "\n".join(audit_results) 
+                + f"\n\n汇总错误：{str(e)}"
+            )
+
+        self.audit_complete.emit(final_result)
+
 class CyberSecurityApp(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -423,7 +544,7 @@ class CyberSecurityApp(QMainWindow):
         self.create_regex_gen_tab()
         self.create_webshell_tab()  # 添加这行
         self.create_translation_tab()
-
+        self.create_source_audit_tab()
     def create_scroll_textedit(self, placeholder="", read_only=True):
         frame = QFrame()
         layout = QVBoxLayout(frame)
@@ -909,7 +1030,94 @@ class CyberSecurityApp(QMainWindow):
     def show_status(self, message, color):
         self.statusBar().showMessage(message)
         self.statusBar().setStyleSheet(f"color: {color}; font-weight: bold;")
+    def create_source_audit_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.addWidget(QLabel("源码安全审计系统", font=QFont("Arial", 20, QFont.Bold)))
 
+        # 文件夹选择区域
+        file_control = QWidget()
+        file_layout = QHBoxLayout(file_control)
+        self.btn_choose_dir = QPushButton("选择源码目录", clicked=self.choose_directory)
+        self.label_dir = QLabel("未选择目录")
+        file_layout.addWidget(self.btn_choose_dir)
+        file_layout.addWidget(self.label_dir)
+        layout.addWidget(file_control)
+
+        # 文件类型过滤
+        filter_control = QWidget()
+        filter_layout = QHBoxLayout(filter_control)
+        self.check_php = QCheckBox("PHP")
+        self.check_jsp = QCheckBox("JSP")
+        self.check_asp = QCheckBox("ASP")
+        self.check_php.setChecked(True)
+        self.check_jsp.setChecked(True)
+        self.check_asp.setChecked(True)
+        filter_layout.addWidget(QLabel("文件类型过滤:"))
+        filter_layout.addWidget(self.check_php)
+        filter_layout.addWidget(self.check_jsp)
+        filter_layout.addWidget(self.check_asp)
+        layout.addWidget(filter_control)
+
+        # 进度条
+        self.progress = QProgressBar()
+        layout.addWidget(self.progress)
+
+        # 操作按钮
+        self.btn_audit = QPushButton("开始深度审计", clicked=self.start_source_audit)
+        layout.addWidget(self.btn_audit)
+
+        # 结果显示
+        _, self.audit_result = self.create_scroll_textedit()
+        layout.addWidget(QLabel("审计结果:"))
+        layout.addWidget(self.audit_result)
+
+        self.tab_widget.addTab(tab, "源码审计")
+
+    def choose_directory(self):
+        directory = QFileDialog.getExistingDirectory(self, "选择源码目录")
+        if directory:
+            self.label_dir.setText(directory)
+            self.scan_files(directory)
+
+    def scan_files(self, directory):
+        exts = []
+        if self.check_php.isChecked(): exts.append('*.php')
+        if self.check_jsp.isChecked(): exts.append('*.jsp')
+        if self.check_asp.isChecked(): exts.append('*.asp')
+
+        self.audit_files = []
+        for ext in exts:
+            self.audit_files.extend(glob.glob(os.path.join(directory, '**', ext), recursive=True))
+
+        self.label_dir.setText(f"已选择目录: {directory} ({len(self.audit_files)}个文件)")
+
+    def start_source_audit(self):
+        if not self.audit_files:
+            self.show_status("请先选择源码目录", "red")
+            return
+
+        self.btn_audit.setEnabled(False)
+        self.audit_result.setPlainText("开始审计...")
+
+        self.audit_thread = SourceCodeAuditThread(self.audit_files, self)  # 添加 self 作为 parent
+        self.audit_thread.audit_complete.connect(self.show_audit_result)
+        self.audit_thread.progress_updated.connect(self.progress.setValue)
+        self.audit_thread.start()
+
+    def show_audit_result(self, result):
+        self.btn_audit.setEnabled(True)
+        result=result.replace('\n', '<br>').replace(' ', '&nbsp;')
+        self.audit_result.setHtml(f"""
+        <html>
+        <body style="font-family: 'Microsoft Yahei'; color: #333;">
+            <div style="padding: 20px; background: #f8f9fa; border-radius: 5px;">
+                {result}
+            </div>
+        </body>
+        </html>
+        """)
+        self.show_status("源码审计完成", "#2ed573")
 if __name__ == '__main__':
     if os.name == 'nt':
         print("当前系统是 Windows")
