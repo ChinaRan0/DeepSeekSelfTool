@@ -9,6 +9,7 @@ from PyQt5.QtCore import Qt, QSize, QThread, pyqtSignal
 from PyQt5.QtGui import QFont, QColor, QPalette, QLinearGradient
 import config
 import glob
+from config import THEMES
 # 配置参数（需要用户自行修改）
 DEEPSEEK_API_KEY = config.DEEPSEEK_API_KEY
 API_ENDPOINT = "https://api.deepseek.com/v1/chat/completions"
@@ -542,9 +543,31 @@ class CyberSecurityApp(QMainWindow):
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
 
+        # 创建主布局
+        main_layout = QVBoxLayout(main_widget)
+
+        # 添加标签页组件
         self.tab_widget = QTabWidget()
-        main_layout = QHBoxLayout(main_widget)
         main_layout.addWidget(self.tab_widget)
+
+        # 创建底部主题选择器容器
+        bottom_widget = QWidget()
+        bottom_layout = QHBoxLayout(bottom_widget)
+        bottom_layout.setContentsMargins(5, 5, 5, 5)
+
+        # 添加弹簧以推动主题选择器到右侧
+        bottom_layout.addStretch()
+
+        # 添加主题选择下拉框
+        theme_label = QLabel("主题：")
+        self.theme_selector = QComboBox()
+        self.theme_selector.addItems(list(THEMES.keys()))
+        self.theme_selector.currentTextChanged.connect(self.change_theme)
+        
+        bottom_layout.addWidget(theme_label)
+        bottom_layout.addWidget(self.theme_selector)
+
+        main_layout.addWidget(bottom_widget)
 
         self.create_traffic_analysis_tab()
         self.create_js_audit_tab()
@@ -840,60 +863,117 @@ class CyberSecurityApp(QMainWindow):
         self.trans_btn.setEnabled(True)
         self.trans_output.setPlainText(result)
         self.show_status("翻译完成", "#2ed573")
-    def get_stylesheet(self):
-        return """
-        QMainWindow {
-            background-color: #1a1a2e;
-        }
-        QLabel {
-            color: #e94560;
-            padding: 5px;
-        }
-        QTextEdit {
-            background-color: #16213e;
-            color: #e6e6e6;
-            border: 2px solid #0f3460;
-            border-radius: 5px;
-            padding: 10px;
+    def change_theme(self, theme_name):
+        if theme_name in THEMES:
+            theme = THEMES[theme_name]
+            self.setStyleSheet(self.get_stylesheet(theme))
+
+    def get_stylesheet(self, theme=None):
+        if theme is None:
+            theme = THEMES["深色主题"]
+        return f"""
+        QMainWindow, QWidget, QFrame {{
+            background-color: {theme['main_bg']};
+            color: {theme['text_color']};
             font-family: 'Menlo';
-        }
-        QPushButton {
-            background-color: #e94560;
+        }}
+        QPushButton {{
+            background-color: {theme['accent_color']};
             color: white;
             border: none;
-            padding: 12px 24px;
-            border-radius: 5px;
-            font-size: 14px;
-            font-weight: bold;
-        }
-        QPushButton:hover {
-            background-color: #ff6b6b;
-        }
-        QPushButton:pressed {
-            background-color: #ff4757;
-        }
-        QScrollArea {
-            background-color: #16213e;
-            border: 1px solid #0f3460;
-            border-radius: 5px;
-        }
-        QTabWidget::pane {
-            border: 1px solid #0f3460;
-            background-color: #16213e;
-        }
-        QTabBar::tab {
-            background: #1a1a2e;
-            color: #e94560;
-            padding: 10px;
-            border: 1px solid #0f3460;
-            border-bottom-color: #16213e;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 500;
+            min-width: 100px;
+            margin: 4px;
+        }}
+        QPushButton:hover {{
+            background-color: {theme['button_hover']};
+        }}
+        QPushButton:pressed {{
+            background-color: {theme['button_pressed']};
+        }}
+        QTextEdit {{
+            background-color: {theme['secondary_bg']};
+            color: {theme['text_color']};
+            border: 1px solid {theme['border_color']};
+            border-radius: 4px;
+            padding: 8px;
+            font-family: Menlo, Consolas, monospace;
+            font-size: 12px;
+            line-height: 1.4;
+        }}
+        QLabel {{
+            color: {theme['text_color']};
+            padding: 4px;
+            font-size: 13px;
+            margin-bottom: 2px;
+        }}
+        QScrollArea {{
+            background-color: transparent;
+            border: none;
+        }}
+        QTabWidget::pane {{
+            border: 1px solid {theme['border_color']};
+            border-radius: 4px;
+            background-color: {theme['secondary_bg']};
+            top: -1px;
+        }}
+        QTabBar::tab {{
+            background: {theme['main_bg']};
+            color: {theme['text_color']};
+            padding: 8px 16px;
+            border: 1px solid {theme['border_color']};
+            border-bottom: none;
             border-top-left-radius: 4px;
             border-top-right-radius: 4px;
-        }
-        QTabBar::tab:selected {
-            background: #16213e;
-            border-bottom-color: #e94560;
-        }
+            margin-right: 2px;
+            font-size: 12px;
+        }}
+        QTabBar::tab:selected {{
+            background: {theme['secondary_bg']};
+            border-bottom: 2px solid {theme['accent_color']};
+        }}
+        QTabBar::tab:hover {{
+            background-color: {theme['button_hover']};
+        }}
+        QComboBox {{
+            background-color: {theme['secondary_bg']};
+            color: {theme['text_color']};
+            border: 1px solid {theme['border_color']};
+            border-radius: 4px;
+            padding: 4px 8px;
+            min-width: 120px;
+        }}
+        QComboBox:hover {{
+            border-color: {theme['accent_color']};
+        }}
+        QComboBox::drop-down {{
+            border: none;
+            width: 16px;
+        }}
+        QComboBox::down-arrow {{
+            width: 0;
+            height: 0;
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-top: 6px solid {theme['text_color']};
+            margin-top: 2px;
+            margin-right: 4px;
+        }}
+        QProgressBar {{
+            border: 1px solid {theme['border_color']};
+            border-radius: 4px;
+            background-color: {theme['main_bg']};
+            text-align: center;
+            height: 16px;
+            margin: 8px 0;
+        }}
+        QProgressBar::chunk {{
+            background-color: {theme['accent_color']};
+            border-radius: 3px;
+        }}
         """
 
     def start_traffic_analysis(self):
