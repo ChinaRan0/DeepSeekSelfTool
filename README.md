@@ -110,6 +110,7 @@ AI检测WebShell的能力可太强了，强的可拍
 git clone https://github.com/ChinaRan0/DeepSeekSelfTool
 cd DeepSeekSelfTool
 pip install -r requirements.txt
+cp config.py.example config.py
 配置config.py
 python DeepSeekSelfTool.py
 ```
