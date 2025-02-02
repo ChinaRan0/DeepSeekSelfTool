@@ -35,7 +35,7 @@ class APIAdapter:
                     "messages": [{"role": "user", "content": prompt}],
                     "temperature": temperature
                 }
-                response = requests.post(self.api_endpoint, headers=headers, json=payload)
+                response = requests.post(self.api_endpoint, headers=headers, json=payload, timeout=60)
             else:  # ollama
                 payload = {
                     "model": self.model,
