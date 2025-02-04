@@ -364,17 +364,25 @@ class SourceCodeAuditThread(QThread):
 
                 # API请求
                 try:
-                    prompt = f"""请对以下代码文件进行安全审计，要求：
-1. 识别SQL注入、XSS、文件包含、命令执行等漏洞
-2. 检查不安全的权限设置和敏感信息泄露
-3. 输出格式：【文件名】{os.path.basename(file_path)}
-   - 漏洞类型: 
-   - 危险等级: 
-   - 位置行号: 
-   - 修复建议: 
-4.如果不存在漏洞，则不输出
-5.忽略API请求失败,不输出
-文件内容：
+                    prompt = f"""【强制指令】你是一个专业的安全审计AI，请按以下要求分析代码：
+        
+1. 漏洞分析流程：
+   1.1 识别潜在风险点（SQL操作、文件操作、用户输入点、文件上传漏洞、CSRF、SSRF、XSS、RCE、OWASP top10等漏洞）
+   1.2 验证漏洞可利用性
+   1.3 按CVSS评分标准评估风险等级
+
+2. 输出规则：
+   - 仅输出确认存在的高危/中危漏洞
+   - 使用严格格式：[风险等级] 类型 - 位置:行号 - 50字内描述
+   - 禁止解释漏洞原理
+   - 禁止给出修复建议
+   - 每文件最多报告3个最严重问题
+
+3. 输出示例（除此外不要有任何输出）：
+   [高危] SQL注入 - {os.path.basename(file_path)}:32 - 未过滤的$_GET参数直接拼接SQL查询
+   [中危] XSS - {os.path.basename(file_path)}:15 - 未转义的userInput输出到HTML
+
+4. 当前代码（仅限分析）：
 {content[:3000]}"""  # 限制每个文件内容长度
 
                     result = self.api.chat_completion(prompt)
