@@ -2,6 +2,7 @@ import sys
 import os
 import json
 import requests
+import re
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QTextEdit, QPushButton, QLabel, QHBoxLayout,
                              QSplitter, QScrollArea, QTabWidget, QFrame,QCheckBox ,QSizePolicy,QComboBox,QFileDialog,QProgressBar)
@@ -9,53 +10,94 @@ from PyQt5.QtCore import Qt, QSize, QThread, pyqtSignal
 from PyQt5.QtGui import QFont, QColor, QPalette, QLinearGradient
 import config
 import glob
+from openai import OpenAI
 from config import THEMES
+
 
 os.environ["QT_IM_MODULE"] = "none"
 
+
 class APIAdapter:
     def __init__(self):
-        self.api_type = config.API_TYPE
-        if self.api_type == "deepseek":
-            self.api_key = config.DEEPSEEK_API_KEY
-            self.api_endpoint = "https://api.deepseek.com/v1/chat/completions"
-        else:  # ollama
+        self.api_type = config.API_TYPE # Supported values: "deepseek", "qwen", "openai", "ollama"
+
+        self.api_endpoints = {
+            "deepseek": "https://api.deepseek.com/v1",
+            "qwen": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            "openai": getattr(config, "OPENAI_BASE_URL", "https://api.openai.com/v1"),
+        }
+
+        self.api_keys = {
+            key: getattr(config, f"{key.upper()}_API_KEY", None)
+            for key in self.api_endpoints
+        }
+        self.api_keys["ollama"] = "OLLAMA" # required, but not used
+
+        self.models = {
+            "ollama": getattr(config, "OLLAMA_MODEL", "deepseek-coder"),
+            "deepseek": getattr(config, "DEEPSEEK_MODEL", "deepseek-chat"),
+            "qwen": getattr(config, "QWEN_MODEL", "qwen-turbo"),
+            "openai": getattr(config, "OPENAI_MODEL", "gpt-4o-mini"),
+        }
+
+        if self.api_type in self.api_endpoints:
+            self.api_endpoint = self.api_endpoints[self.api_type]
+            self.api_key = self.api_keys.get(self.api_type)
+            self.model = self.models[self.api_type]
+        elif self.api_type == "ollama":
             self.api_endpoint = config.OLLAMA_API_URL
-            self.model = config.OLLAMA_MODEL
+            self.model = getattr(config, "OLLAMA_MODEL", "deepseek-coder")
+        else:
+            raise ValueError(f"Unsupported API type: {self.api_type}")
+        print(f"API类型: {self.api_type}")
+        print(f"API地址: {self.api_endpoint}")
+        print(f"模型: {self.model}")
+
 
     def chat_completion(self, prompt, temperature=0.3):
         try:
-            if self.api_type == "deepseek":
-                headers = {
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json"
-                }
-                payload = {
-                    "model": "deepseek-chat",
-                    "messages": [{"role": "user", "content": prompt}],
-                    "temperature": temperature
-                }
-                response = requests.post(self.api_endpoint, headers=headers, json=payload, timeout=60)
-            else:  # ollama
-                payload = {
-                    "model": self.model,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "stream": False
-                }
-                response = requests.post(self.api_endpoint, json=payload)
+            return self._send_request(self.model, prompt, temperature)
+        except Exception as e:
+            raise ValueError(f"API请求失败: {str(e)}")
+
+    def _send_request(self, model, prompt, temperature):
+        if self.api_type in ["deepseek", "qwen", "openai"]:
+            client = OpenAI(
+                api_key=self.api_key,
+                base_url=self.api_endpoint
+            )
+            chat_completion = client.chat.completions.create(
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                model=model,
+                temperature=temperature,
+                stream=False,
+            )
+            return chat_completion.choices[0].message.content
+        
+        elif self.api_type == "ollama":
+            headers = {"Content-Type": "application/json"}
+            payload = {
+                "model": self.model,
+                "messages": [{"role": "user", "content": prompt}],
+                "stream": False
+            }
+            response = requests.post(self.api_endpoint, headers=headers, json=payload, timeout=60)
             
             response.raise_for_status()
-            if self.api_type == "deepseek":
-                return response.json()["choices"][0]["message"]["content"]
-            else:
-                content = response.json()["message"]["content"]
-                # 使用正则表达式移除<think></think>标签及其内容
-                import re
-                content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL)
-                return content.strip()
+            data = response.json()
+            return self._clean_ollama_response(data["message"]["content"])
+        else:
+            raise ValueError(f"Unsupported API type: {self.api_type}")
+        
 
-        except Exception as e:
-            raise Exception(f"API请求错误: {str(e)}")
+    def _clean_ollama_response(self, content):
+        return re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
+
 
 class AnalysisThread(QThread):
     analysis_complete = pyqtSignal(str, bool)
@@ -1115,6 +1157,7 @@ class CyberSecurityApp(QMainWindow):
         </html>
         """)
         self.show_status("源码审计完成", "#2ed573")
+
 if __name__ == '__main__':
     if os.name == 'nt':
         print("当前系统是 Windows")
