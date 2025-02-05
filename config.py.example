@@ -1,12 +1,29 @@
 # API配置
-API_TYPE="deepseek"  # 可选值: "deepseek" 或 "ollama"
+API_TYPE="qwen"  # Supported values: "deepseek", "qwen", "openai", "ollama"
 
 # DeepSeek API配置
 DEEPSEEK_API_KEY=""
 
-# Ollama API配置
-OLLAMA_API_URL="http://localhost:11434/api/chat"  # Ollama API地址
-OLLAMA_MODEL="deepseek-coder"  # Ollama模型名称
+# OPENAI
+OPENAI_API_KEY=""
+
+# QWEN
+QWEN_API_KEY=""
+
+# OLLAMA
+OLLAMA_API_KEY=""
+OLLAMA_API_URL="http://localhost:11434/v1"  # Ollama API地址
+
+
+## 可选参数
+## OPENAI 第三方API地址
+# OPENAI_API_URL="https://api.openai.com/v1/"
+## MODEL
+# DEEPSEEK_MODEL=""
+# QWEN_MODEL=""
+# OPENAI_MODEL=""
+# OLLAMA_MODEL=""
+
 
 # 主题配色方案
 THEMES = {
