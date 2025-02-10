@@ -4,7 +4,7 @@ import json
 import requests
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QTextEdit, QPushButton, QLabel, QHBoxLayout,
-                             QSplitter, QScrollArea, QTabWidget, QFrame,QCheckBox ,QSizePolicy,QComboBox,QFileDialog,QProgressBar)
+                             QSplitter, QScrollArea, QTabWidget,QLineEdit, QFrame,QCheckBox ,QSizePolicy,QComboBox,QFileDialog,QProgressBar)
 from PyQt5.QtCore import Qt, QSize, QThread, pyqtSignal
 from PyQt5.QtGui import QFont, QColor, QPalette, QLinearGradient
 import config
@@ -18,7 +18,7 @@ class APIAdapter:
         self.api_type = config.API_TYPE
         if self.api_type == "deepseek":
             self.api_key = config.DEEPSEEK_API_KEY
-            self.api_endpoint = "https://api.deepseek.com/v1/chat/completions"
+            self.api_endpoint = config.DEEPSEEK_API_URL
         else:  # ollama
             self.api_endpoint = config.OLLAMA_API_URL
             self.model = config.OLLAMA_MODEL
@@ -31,7 +31,7 @@ class APIAdapter:
                     "Content-Type": "application/json"
                 }
                 payload = {
-                    "model": "deepseek-chat",
+                    "model": config.DEEPSEEK_MODEL,
                     "messages": [{"role": "user", "content": prompt}],
                     "temperature": temperature
                 }
@@ -436,6 +436,49 @@ class SourceCodeAuditThread(QThread):
         self.progress_updated.emit(100)  # 最后一步
         self.audit_complete.emit(final_result)  # 此时必定100%
 
+
+class VulnerabilityAnalysisThread(QThread):
+    analysis_complete = pyqtSignal(str, str)
+
+    def __init__(self, url, vulnerability, parent=None):
+        super().__init__(parent)
+        self.url = url
+        self.vulnerability = vulnerability
+        self.api = APIAdapter()
+
+    def run(self):
+        try:
+            prompt = f"""请分析以下URL和漏洞信息，并提供以下内容：
+1. 漏洞描述
+2. 攻击场景
+3. 修复建议
+4. 整体风险评级（危急、高危、中危、低危）
+
+请用中文按以下格式响应：
+【漏洞链接】URL
+【漏洞描述】简明扼要描述漏洞
+【攻击场景】描述可能的攻击场景
+【修复建议】提供具体的修复建议
+【风险评级】危急/高危/中危/低危
+
+URL: {self.url}
+漏洞: {self.vulnerability}"""
+
+            result = self.api.chat_completion(prompt)
+            risk_level = "低危"  # 默认风险等级
+            if "【风险评级】危急" in result:
+                risk_level = "危急"
+            elif "【风险评级】高危" in result:
+                risk_level = "高危"
+            elif "【风险评级】中危" in result:
+                risk_level = "中危"
+
+            self.analysis_complete.emit(result, risk_level)
+
+        except Exception as e:
+            self.analysis_complete.emit(f"错误发生: {str(e)}", "低危")
+
+
 class CyberSecurityApp(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -485,6 +528,7 @@ class CyberSecurityApp(QMainWindow):
         self.create_webshell_tab()  # 添加这行
         self.create_translation_tab()
         self.create_source_audit_tab()
+        self.create_vulnerability_analysis_tab()
     def create_scroll_textedit(self, placeholder="", read_only=True):
         frame = QFrame()
         layout = QVBoxLayout(frame)
@@ -722,6 +766,73 @@ class CyberSecurityApp(QMainWindow):
         layout.addWidget(self.trans_btn)
 
         self.tab_widget.addTab(tab, "AI翻译")
+
+    def create_vulnerability_analysis_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.addWidget(QLabel("漏洞分析系统", font=QFont("Arial", 20, QFont.Bold)))
+
+        # URL输入
+        self.url_input = QLineEdit()
+        self.url_input.setPlaceholderText("输入URL...")
+        layout.addWidget(QLabel("URL:"))
+        layout.addWidget(self.url_input)
+
+        # 漏洞输入
+        self.vulnerability_input = QLineEdit()
+        self.vulnerability_input.setPlaceholderText("输入漏洞类型...")
+        layout.addWidget(QLabel("漏洞类型:"))
+        layout.addWidget(self.vulnerability_input)
+
+        # 分析按钮
+        self.analyze_vuln_btn = QPushButton("开始漏洞分析", clicked=self.start_vulnerability_analysis)
+        layout.addWidget(self.analyze_vuln_btn)
+
+        # 结果显示
+        _, self.vuln_result = self.create_scroll_textedit()
+        layout.addWidget(QLabel("分析结果:"))
+        layout.addWidget(self.vuln_result)
+
+        self.tab_widget.addTab(tab, "漏洞分析")
+    def start_vulnerability_analysis(self):
+        url = self.url_input.text().strip()
+        vulnerability = self.vulnerability_input.text().strip()
+        if not url or not vulnerability:
+            self.show_status("请输入URL和漏洞类型", "red")
+            return
+
+        self.analyze_vuln_btn.setEnabled(False)
+        self.vuln_result.setPlainText("分析中...")
+
+        self.vuln_thread = VulnerabilityAnalysisThread(url, vulnerability)
+        self.vuln_thread.analysis_complete.connect(self.show_vulnerability_result)
+        self.vuln_thread.start()
+
+    def show_vulnerability_result(self, result, risk_level):
+        self.analyze_vuln_btn.setEnabled(True)
+        
+        # 根据风险等级设置背景颜色
+        if risk_level == "危急":
+            bg_color = "#ff4757"
+        elif risk_level == "高危":
+            bg_color = "#ffa502"
+        elif risk_level == "中危":
+            bg_color = "#ffd700"
+        else:
+            bg_color = "#2ed573"
+
+        self.vuln_result.setStyleSheet(f"""
+            QTextEdit {{
+                background-color: {bg_color};
+                color: white;
+                border: 2px solid {bg_color};
+                border-radius: 5px;
+                padding: 15px;
+            }}
+        """)
+        self.vuln_result.setHtml(f"<pre>{result}</pre>")
+        self.show_status(f"漏洞分析完成，风险等级: {risk_level}", bg_color)
+
     def start_webshell_analysis(self):
         content = self.webshell_input.toPlainText().strip()
         if not content:

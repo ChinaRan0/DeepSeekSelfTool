@@ -46,11 +46,17 @@ class HackerWorker(QThread):
    - 使用严格格式：[风险等级] 类型 - 位置:行号 - 50字内描述
    - 禁止解释漏洞原理
    - 禁止给出修复建议
-   - 每文件最多报告3个最严重问题
+   - 如果有可能，给出POC（HTTP请求数据包）
 
 3. 输出示例（除此外不要有任何输出）：
    [高危] SQL注入 - user_login.php:32 - 未过滤的$_GET参数直接拼接SQL查询
+   [POC]POST /login.php HTTP/1.1
+   Host: example.com
+   Content-Type: application/x-www-form-urlencoded
    [中危] XSS - comment.jsp:15 - 未转义的userInput输出到HTML
+   [POC]POST /login.php HTTP/1.1
+   Host: example.com
+   Content-Type: application/x-www-form-urlencoded
 
 4. 当前代码（仅限分析）：
 {content[:3000]}"""

@@ -1,8 +1,16 @@
 # API配置
-API_TYPE="ollama"  # 可选值: "deepseek" 或 "ollama"
+API_TYPE="deepseek"  # 可选值: "deepseek" 或 "ollama"
 
 # DeepSeek API配置
+# 官方默认API地址: "https://api.deepseek.com/v1/chat/completions"
+# 硅基流动：https://api.siliconflow.cn/v1/chat/completion
+DEEPSEEK_API_URL=""
+
 DEEPSEEK_API_KEY=""
+
+# DeepSeek模型名称，官方默认模型: "deepseek-chat"
+# 硅基流动：deepseek-ai/DeepSeek-V3
+DEEPSEEK_MODEL=""
 
 # Ollama API配置
 OLLAMA_API_URL="http://localhost:11434/api/chat"  # Ollama API地址
