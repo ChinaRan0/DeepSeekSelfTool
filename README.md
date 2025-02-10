@@ -2,11 +2,19 @@
 
 首个由DeepSeek独立开发的AI网络安全工具箱
 
-首发公众号知攻善防实验室
+首发公众号 **知攻善防实验室**
 
 ## 目前功能
 
-流量分析、JS代码审计、进程分析、HTTP转python、文本处理、正则表达式生成、WebShell检测、翻译
+流量分析、JS代码审计、进程分析、HTTP转python、文本处理、正则表达式生成、WebShell检测、翻译、代码审计
+
+
+
+## bilibili
+
+https://www.bilibili.com/video/BV1yxNAenEwj/
+
+https://www.bilibili.com/video/BV1skNoeuEZu/
 
 ### 流量分析
 
@@ -18,21 +26,21 @@
 
 恶意流量
 
-![img](./assets/640-20250201024646641.png)
+![](./assets/image-20250210204613367.png)
 
 正常流量
 
-![img](./assets/640-20250201024642899.png)
+![](./assets/image-20250210204511164.png)
 
 在流量分析中，经常需要解码以及日常需要解码的需求，可以直接加一个AI只能解码
 
-![img](./assets/640-20250201024639662.png)
+![](./assets/image-20250210204719077.png)
 
 ### JS代码审计
 
 直接将关键的JavaScript代码粘贴进来，AI自动输出问题和风险点
 
-![img](./assets/640-20250201024635823.png)
+![](./assets/image-20250210204957732.png)
 
 ### 进程分析
 
@@ -44,7 +52,7 @@
 
 蓝队：应急响应进程分析
 
-![img](./assets/640-20250201024631558.png)
+![](./assets/image-20250210203856225.png)
 
 会把进程分为三类，可疑进程、杀软进程、第三方软件进程，并总结给你建议。
 
@@ -52,7 +60,7 @@
 
 有时候我们想写POC/EXP的时候，很多重复性的代码需要去写，这里不用了，直接把HTTP请求包粘贴进去，AI几秒钟就生成完成了
 
-![img](./assets/640-20250201024628035.png)
+![](./assets/image-20250210204543714.png)
 
 ### 文本处理
 
@@ -60,7 +68,7 @@
 
 例如：
 
-![img](./assets/640-20250201024621886.png)
+![](./assets/image-20250210204552857.png)
 
 ### 正则表达式生成
 
@@ -68,7 +76,7 @@
 
 例如在网页爬虫中
 
-![img](./assets/640-20250201024618363.png)
+![](./assets/image-20250210204600326.png)
 
 我输入源文本，这个文本可以是任何文本，我这里用的是HTML，然后我想匹配样本格式，AI就会给我很多正则表达式供我参考
 
@@ -84,25 +92,37 @@ AI检测WebShell的能力可太强了，强的可拍
 
 这是以前文章一个大佬写的“原神免杀WebShell”的检测结果
 
-![img](./assets/640-20250201024615136.png)
+![](./assets/image-20250210205106905.png)
 
 正常文件
 
-![img](./assets/640-20250201024610164.png)
+![](./assets/image-20250210205203960.png)
 
 ### AI翻译
 
 以SQLmap为例子
 
-![img](./assets/640-20250201024603275.png)
+![](./assets/image-20250210205523064.png)
 
 效果自己看，嘻嘻。
 
 
 
-我随机抽取了4个php文件做测试，结果还挺好的，都审出来了。但是由于上下文的原因，不能夸文件进行审计，原理是逐个逐个将文件吐给AI，单丝对于我这种不会代码审计的，已经足够爽了。
+我随机抽取了几个php文件做测试，结果还挺好的，都审出来了。但是由于上下文的原因，不能夸文件进行审计，原理是逐个逐个将文件吐给AI，单丝对于我这种不会代码审计的，已经足够爽了。
 
-![图片](./assets/640.png)
+![](./assets/image-20250210205353354.png)
+
+
+
+## 漏洞分析
+
+写报告用的，由于平时写报告需要网上各种搜索复制粘贴，所以弄的这个。（自动化写报告）
+
+![image-20250210205647266](./assets/image-20250210205647266.png)
+
+
+
+
 
 ### 使用教程 
 
@@ -110,9 +130,38 @@ AI检测WebShell的能力可太强了，强的可拍
 git clone https://github.com/ChinaRan0/DeepSeekSelfTool
 cd DeepSeekSelfTool
 pip install -r requirements.txt
-cp config.py.example config.py
 配置config.py
 python DeepSeekSelfTool.py
+```
+
+## config配置教程
+
+```python
+# API配置
+API_TYPE="deepseek"  # 可选值: "deepseek" 或 "ollama"[二选一]
+
+# DeepSeek API配置
+# 官方默认API地址: "https://api.deepseek.com/v1/chat/completions"
+# 硅基流动：https://api.siliconflow.cn/v1/chat/completions
+DEEPSEEK_API_URL=""  # 这里填写API地址
+
+DEEPSEEK_API_KEY=""  # 这里填写API-key
+
+# DeepSeek模型名称，官方默认模型: "deepseek-chat"
+# 硅基流动：deepseek-ai/DeepSeek-V3
+DEEPSEEK_MODEL=""		# 这里填写模型
+
+
+
+# Ollama API配置
+OLLAMA_API_URL="http://localhost:11434/api/chat"  # Ollama API地址
+OLLAMA_MODEL="qwen2.5-coder:14b"  # Ollama模型名称
+
+
+
+
+
+
 ```
 
 
