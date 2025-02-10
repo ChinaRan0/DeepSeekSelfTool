@@ -425,9 +425,8 @@ class SourceCodeAuditThread(QThread):
 要求：
 1. 按【高危】【中危】【低危】三级分类
 2. 每个漏洞注明文件名和行号
-3. 同类漏洞合并显示
-4. 如果有可能，给出POC（HTTP请求数据包）
-5. 不使用markdown格式，直接输出文本"""
+3. 如果有可能，给出POC（HTTP请求数据包）
+4. 不使用markdown格式，直接输出文本"""
 
                 final_result = self.api.chat_completion(final_prompt)
                 final_result += "\n\n--- 原始数据备份 ---\n" + "\n".join(audit_results)
