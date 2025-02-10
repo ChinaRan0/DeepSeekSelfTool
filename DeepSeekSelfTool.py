@@ -377,10 +377,17 @@ class SourceCodeAuditThread(QThread):
    - 禁止解释漏洞原理
    - 禁止给出修复建议
    - 每文件最多报告3个最严重问题
+   - 如果有可能，给出POC（HTTP请求数据包）
 
 3. 输出示例（除此外不要有任何输出）：
    [高危] SQL注入 - {os.path.basename(file_path)}:32 - 未过滤的$_GET参数直接拼接SQL查询
+   [POC]POST /login.php HTTP/1.1
+   Host: example.com
+   Content-Type: application/x-www-form-urlencoded
    [中危] XSS - {os.path.basename(file_path)}:15 - 未转义的userInput输出到HTML
+   [POC]POST /login.php HTTP/1.1
+   Host: example.com
+   Content-Type: application/x-www-form-urlencoded
 
 4. 当前代码（仅限分析）：
 {content[:3000]}"""  # 限制每个文件内容长度
@@ -419,7 +426,8 @@ class SourceCodeAuditThread(QThread):
 1. 按【高危】【中危】【低危】三级分类
 2. 每个漏洞注明文件名和行号
 3. 同类漏洞合并显示
-4. 不使用markdown格式，直接输出文本"""
+4. 如果有可能，给出POC（HTTP请求数据包）
+5. 不使用markdown格式，直接输出文本"""
 
                 final_result = self.api.chat_completion(final_prompt)
                 final_result += "\n\n--- 原始数据备份 ---\n" + "\n".join(audit_results)
