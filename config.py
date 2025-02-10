@@ -3,7 +3,7 @@ API_TYPE="deepseek"  # 可选值: "deepseek" 或 "ollama"
 
 # DeepSeek API配置
 # 官方默认API地址: "https://api.deepseek.com/v1/chat/completions"
-# 硅基流动：https://api.siliconflow.cn/v1/chat/completion
+# 硅基流动：https://api.siliconflow.cn/v1/chat/completions
 DEEPSEEK_API_URL=""
 
 DEEPSEEK_API_KEY=""
