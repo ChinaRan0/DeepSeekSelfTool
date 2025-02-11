@@ -171,6 +171,7 @@ class CyberScanner(QtWidgets.QMainWindow):
         left_layout.addWidget(self.lbl_path)
 
         # 模式选择
+         # 模式选择
         mode_group = QtWidgets.QGroupBox("🔧 检测模式")
         mode_group.setStyleSheet("""
             QGroupBox {
@@ -193,6 +194,14 @@ class CyberScanner(QtWidgets.QMainWindow):
         mode_group.setLayout(mode_layout)
         left_layout.addWidget(mode_group)
 
+        # 新增：是否审计 JavaScript 文件的复选框
+        self.checkbox_audit_js = QtWidgets.QCheckBox("审计 静态 文件")
+        self.checkbox_audit_js.setChecked(True)  # 默认选中
+        self.checkbox_audit_js.setStyleSheet("""
+            QCheckBox { color: #00ff00; padding: 8px; }
+            QCheckBox::indicator { width: 20px; height: 20px; }
+        """)
+        left_layout.addWidget(self.checkbox_audit_js)
         # 文件树
         self.file_tree = QtWidgets.QTreeView()
         self.file_model = QtWidgets.QFileSystemModel()
@@ -292,6 +301,12 @@ class CyberScanner(QtWidgets.QMainWindow):
 
     def scan_code_files(self, directory):
         allowed_ext = ['.php', '.jsp', '.asp', '.js', '.html', '.py', '.java']
+        
+        # 如果用户选择不审计 静态 文件，则从允许的扩展名中移除 .js
+        if not self.checkbox_audit_js.isChecked():
+            allowed_ext.remove('.js')
+            allowed_ext.remove('.html')
+        
         code_files = {}
         
         for root, _, files in os.walk(directory):
