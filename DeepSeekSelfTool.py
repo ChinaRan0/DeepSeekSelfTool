@@ -464,7 +464,7 @@ class CyberSecurityApp(QMainWindow):
         self.setStyleSheet(self.get_stylesheet())
 
     def init_ui(self):
-        self.setWindowTitle('DeepSeek 安全分析平台 公众号:知攻善防实验室 By:ChinaRan404')
+        self.setWindowTitle('DeepSeek 安全分析平台 公众号:知攻善防实验室 By:ChinaRan404&森然')
         self.setGeometry(300, 300, 1200, 800)
         self.setMinimumSize(QSize(1200, 800))
 
