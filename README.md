@@ -163,9 +163,20 @@ OLLAMA_MODEL="qwen2.5-coder:14b"  # Ollama模型名称
 
 
 ```
+## 运行环境
 
+支持Windows+MacOS+Linux
+注意，Linux需要讲DeepSeekSelfTool.py的
+```python
+    if os.name == 'nt':
+        print("当前系统是 Windows")
+        sys.argv += ['-platform', 'windows']
 
-
+    elif os.name == 'posix':
+        print("当前系统是 macOS")
+        sys.argv += ['-platform', 'cocoa']
+```
+删除
 
 
 
