@@ -129,7 +129,7 @@ class WebshellWorker(QThread):
 class CyberScanner(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("AI安全审计系统 BY:公众号_知攻善防实验室 ChinaRan404 ")
+        self.setWindowTitle("AI安全审计系统 BY:公众号_知攻善防实验室 ChinaRan404&森然 ")
         self.setGeometry(100, 100, 1280, 720)
         self.setup_ui()
         self.files_content = {}
