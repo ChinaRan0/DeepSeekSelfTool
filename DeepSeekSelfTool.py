@@ -343,12 +343,16 @@ class SourceCodeAuditThread(QThread):
 
     def run(self):
         total_files = len(self.files)
-        total_steps = total_files + 2  # 总步骤 = 文件数 + 2
+        total_steps = total_files +1 # 修改总步骤数为文件数
         audit_results = []
         
-        # ================= 阶段1：处理所有文件 =================
         for i, file_path in enumerate(self.files):
             try:
+                # 进度更新（每个文件占1步）
+                current_step = i + 1
+                progress = int((current_step / total_steps) * 100)
+                self.progress_updated.emit(progress)
+
                 # 文件读取
                 try:
                     with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
@@ -357,15 +361,9 @@ class SourceCodeAuditThread(QThread):
                     audit_results.append(f"【文件读取失败】{os.path.basename(file_path)}\n错误原因：{str(e)}")
                     continue
 
-                # 更新进度（每个文件占1步）
-                current_step = i + 1
-                progress = int( (current_step / total_steps) * 100 )
-                self.progress_updated.emit(progress)
-
                 # API请求
                 try:
                     prompt = f"""【强制指令】你是一个专业的安全审计AI，请按以下要求分析代码：
-        
 1. 漏洞分析流程：
    1.1 识别潜在风险点（SQL操作、文件操作、用户输入点、文件上传漏洞、CSRF、SSRF、XSS、RCE、OWASP top10等漏洞）
    1.2 验证漏洞可利用性
@@ -389,10 +387,12 @@ class SourceCodeAuditThread(QThread):
    Host: example.com
    Content-Type: application/x-www-form-urlencoded
 
+
 4. 当前代码（仅限分析）：
-{content[:3000]}"""  # 限制每个文件内容长度
+{content[:3000]}"""
 
                     result = self.api.chat_completion(prompt)
+                    audit_results.append(f"=== {os.path.basename(file_path)} ===\n")
                     audit_results.append(result)
 
                 except Exception as e:
@@ -402,46 +402,17 @@ class SourceCodeAuditThread(QThread):
                         f"错误详情：{str(e)}"
                     )
 
-            except Exception as e:  # 全局异常兜底
+            except Exception as e:
                 audit_results.append(
                     f"【未知错误】{os.path.basename(file_path)}\n"
                     f"错误类型：{type(e).__name__}\n"
                     f"错误详情：{str(e)}"
                 )
 
-        # ================= 阶段2：结果汇总 =================
-        try:
-            # 更新进度到 N+1 步（汇总开始）
-            self.progress_updated.emit( int( (total_files + 1) / total_steps * 100 ) )
-            
-            # 生成汇总结果
-            if len(audit_results) == 0:
-                final_result = "⚠️ 所有文件处理均失败，请检查网络连接和API密钥"
-            else:
-                audit_results_str = '\n'.join(audit_results)
-                final_prompt = f"""请综合以下审计结果，按危险等级分类整理：
-{audit_results_str}
-
-要求：
-1. 按【高危】【中危】【低危】三级分类
-2. 每个漏洞注明文件名和行号
-3. 如果有可能，给出POC（HTTP请求数据包）
-4. 不使用markdown格式，直接输出文本"""
-
-                final_result = self.api.chat_completion(final_prompt)
-                final_result += "\n\n--- 原始数据备份 ---\n" + "\n".join(audit_results)
-
-        except Exception as e:
-            final_result = (
-                "⚠️ 汇总阶段失败，以下是各文件独立分析结果：\n\n" 
-                + "\n".join(audit_results) 
-                + f"\n\n汇总错误：{str(e)}"
-            )
-
-        # ================= 阶段3：最终提交 =================
-        # 强制进度到100%后才发送结果
-        self.progress_updated.emit(100)  # 最后一步
-        self.audit_complete.emit(final_result)  # 此时必定100%
+        # 最终结果处理
+        final_result = "\n".join(audit_results)
+        self.progress_updated.emit(100)
+        self.audit_complete.emit(final_result)
 
 
 class VulnerabilityAnalysisThread(QThread):
@@ -1205,7 +1176,9 @@ class CyberSecurityApp(QMainWindow):
         for ext in exts:
             self.audit_files.extend(glob.glob(os.path.join(directory, '**', ext), recursive=True))
 
-        self.label_dir.setText(f"已选择目录: {directory} ({len(self.audit_files)}个文件)")
+        file_count = len(self.audit_files)
+        self.label_dir.setText(f"已选择目录: {directory} | 文件数: {file_count}")
+        self.progress.setValue(0)
 
     def start_source_audit(self):
         if not self.audit_files:
@@ -1222,15 +1195,17 @@ class CyberSecurityApp(QMainWindow):
 
     def show_audit_result(self, result):
         self.btn_audit.setEnabled(True)
-        result=result.replace('\n', '<br>').replace(' ', '&nbsp;')
-        self.audit_result.setHtml(f"""
-        <html>
-        <body style="font-family: 'Microsoft Yahei'; color: #333;">
-            <div style="padding: 20px; background: #f8f9fa; border-radius: 5px;">
-                {result}
-            </div>
-        </body>
-        </html>
+        # 保留原始格式显示
+        self.audit_result.setPlainText(result)
+        # 设置等宽字体样式
+        self.audit_result.setStyleSheet("""
+            QTextEdit {
+                font-family: 'Consolas';
+                font-size: 11px;
+                background-color: #1e1e1e;
+                color: #d4d4d4;
+                border: 1px solid #3c3c3c;
+            }
         """)
         self.show_status("源码审计完成", "#2ed573")
 if __name__ == '__main__':
