@@ -84,7 +84,7 @@ https://www.bilibili.com/video/BV1skNoeuEZu/
 
 ### WebShell检测
 
-AI检测WebShell的能力可太强了，强的可拍
+AI检测WebShell的能力可太强了，强的可怕
 
 他可以检测WebShell和内存马，Webshell直接给文件粘贴进去，内存马需要你人工dump出来。
 
