@@ -17,6 +17,7 @@ OLLAMA_API_URL="http://localhost:11434/api/chat"  # Ollama API地址
 OLLAMA_MODEL="qwen2.5-coder:14b"  # Ollama模型名称
 
 # 主题配色方案
+# 主题配色方案
 THEMES = {
     "深色主题": {
         "main_bg": "#1e1e1e",
@@ -35,5 +36,34 @@ THEMES = {
         "border_color": "#e0e0e0",
         "button_hover": "#1976d2",
         "button_pressed": "#1565c0"
+    },
+    "科技感主题": {
+        "main_bg": "#0a192f",
+        "secondary_bg": "#172a45", 
+        "text_color": "#ccd6f6", 
+        "accent_color": "#64ffda",  
+        "border_color": "#233554",
+        "button_hover": "#52dbbf", 
+        "button_pressed": "#3ebca6"  
+    },
+    "黑客粉嫩主题": {
+        "main_bg": "#FFEDED", 
+        "secondary_bg": "#FFD9D9",
+        "text_color": "#222222", 
+        "accent_color": "#FF1493", 
+        "border_color": "#FF9AA2",
+        "button_hover": "#FF007F",  
+        "button_pressed": "#DB7093" 
+},
+    "护眼主题": {
+        "main_bg": "#e0f0e0", 
+        "secondary_bg": "#f0f8f0",
+        "text_color": "#333333",
+        "accent_color": "#4caf50",
+        "border_color": "#c8e6c9",
+        "button_hover": "#388e3c",
+        "button_pressed": "#2e7d32"
     }
+
+
 }
