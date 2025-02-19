@@ -187,7 +187,9 @@ OLLAMA_MODEL="qwen2.5-coder:14b"  # Ollama模型名称
 
 
 
+## Star History
 
+[![Star History Chart](https://api.star-history.com/svg?repos=ChinaRan0/DeepSeekSelfTool&type=Date)](https://star-history.com/#ChinaRan0/DeepSeekSelfTool&Date)
 
 
 
