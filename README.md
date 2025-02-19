@@ -22,7 +22,11 @@ https://www.bilibili.com/video/BV1skNoeuEZu/
 
 意旨，粘贴数据包，让AI判断是否为恶意流量，方便安服、护网蓝队使用
 
+### 模型推荐
 
+线上 api 模型推荐 DeepSeekV3 （不要使用 R1 推理模型，会有多余的输出且非常慢。）
+
+本地模型推荐使用 qwen2.5-coder:14b
 
 恶意流量
 
