@@ -289,6 +289,7 @@ class WebShellAnalysisThread(QThread):
 3. 分析代码中的可疑功能（如命令执行、文件上传、信息收集）
 4. 检查混淆编码、加密手段等规避技术
 5. 最终结论：是否为恶意软件（是/否）
+6. 如果否，则输出安全文件，其他不要输出
 
 请用中文按以下格式响应：
 【分析结果】是/否
@@ -457,6 +458,59 @@ URL: {self.url}
         except Exception as e:
             self.analysis_complete.emit(f"错误发生: {str(e)}", "低危")
 
+
+class BatchWebShellAnalysisThread(QThread):
+    progress_updated = pyqtSignal(int, str, str)
+    scan_complete = pyqtSignal()
+
+    def __init__(self, file_list, parent=None):
+        super().__init__(parent)
+        self.file_list = file_list
+        self.running = True
+
+    def run(self):
+        total_files = len(self.file_list)
+        for index, file_path in enumerate(self.file_list):
+            if not self.running:
+                break
+            
+            try:
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read(1024*1024)  # 限制读取1MB
+
+                thread = WebShellAnalysisThread(content)
+                thread.analysis_complete.connect(
+                    lambda result, malicious, path=file_path: 
+                        self.handle_result(result, malicious, path)
+                )
+                thread.run()  # 同步执行
+
+            except Exception as e:
+                self.progress_updated.emit(
+                    int((index+1)/total_files*100),
+                    f"扫描失败: {os.path.basename(file_path)}",
+                    f"错误: {str(e)}"
+                )
+
+        self.scan_complete.emit()
+
+    def handle_result(self, result, malicious, file_path):
+        filename = os.path.basename(file_path)
+        if malicious:
+            status = f"检测到恶意文件: {filename}"
+            color = "#ff4757"
+        else:
+            status = f"安全文件: {filename}"
+            color = "#2ed573"
+        
+        self.progress_updated.emit(
+            0,  # 进度由主线程计算
+            status,
+            f"=== {filename} ===\n{result}\n\n"
+        )
+
+    def stop(self):
+        self.running = False
 
 class CyberSecurityApp(QMainWindow):
     def __init__(self):
@@ -689,15 +743,41 @@ class CyberSecurityApp(QMainWindow):
     def create_webshell_tab(self):
         tab = QWidget()
         layout = QVBoxLayout(tab)
-        layout.addWidget(QLabel("WebShell/内存马检测系统", font=QFont("Arial", 20, QFont.Bold)))
+        layout.addWidget(QLabel("WebShell检测系统", font=QFont("Arial", 20, QFont.Bold)))
 
-        _, self.webshell_input = self.create_scroll_textedit("粘贴文件内容或内存dump数据...", False)
-        layout.addWidget(QLabel("输入待检测内容:"))
-        layout.addWidget(self.webshell_input)
+        # 文件选择区域
+        file_control = QWidget()
+        file_layout = QHBoxLayout(file_control)
+        self.btn_choose_file = QPushButton("选择单个文件", clicked=self.choose_webshell_file)
+        self.btn_choose_dir = QPushButton("选择扫描目录", clicked=self.choose_webshell_dir)
+        self.label_scan_path = QLabel("未选择文件/目录")
+        file_layout.addWidget(self.btn_choose_file)
+        file_layout.addWidget(self.btn_choose_dir)
+        file_layout.addWidget(self.label_scan_path)
+        layout.addWidget(file_control)
 
-        self.webshell_btn = QPushButton("开始深度检测", clicked=self.start_webshell_analysis)
-        layout.addWidget(self.webshell_btn)
+        # 文件类型过滤
+        filter_control = QWidget()
+        filter_layout = QHBoxLayout(filter_control)
+        self.check_php = QCheckBox("PHP")
+        self.check_jsp = QCheckBox("JSP")
+        self.check_asp = QCheckBox("ASP")
+        self.check_php.setChecked(True)
+        filter_layout.addWidget(QLabel("检测文件类型:"))
+        filter_layout.addWidget(self.check_php)
+        filter_layout.addWidget(self.check_jsp)
+        filter_layout.addWidget(self.check_asp)
+        layout.addWidget(filter_control)
 
+        # 进度条
+        self.webshell_progress = QProgressBar()
+        layout.addWidget(self.webshell_progress)
+
+        # 操作按钮
+        self.btn_start_scan = QPushButton("开始深度检测", clicked=self.start_webshell_scan)
+        layout.addWidget(self.btn_start_scan)
+
+        # 结果显示
         _, self.webshell_result = self.create_scroll_textedit()
         layout.addWidget(QLabel("检测结果:"))
         layout.addWidget(self.webshell_result)
@@ -843,7 +923,11 @@ class CyberSecurityApp(QMainWindow):
         self.webshell_btn.setEnabled(True)
         bg_color = "#ff4757" if is_malicious else "#2ed573"
         border_color = "#e94560" if is_malicious else "#7bed9f"
-
+        self.webshell_result.insertPlainText(f"\n{result}")
+        self.webshell_result.ensureCursorVisible()
+        if is_malicious:
+            self.malicious_count += 1
+            self.show_status(f"发现恶意文件: {self.malicious_count}", "#ff4757")
         self.webshell_result.setStyleSheet(f"""
             QTextEdit {{
                 background-color: {bg_color};
@@ -1209,6 +1293,58 @@ class CyberSecurityApp(QMainWindow):
             }
         """)
         self.show_status("源码审计完成", "#2ed573")
+
+    def choose_webshell_file(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "选择检测文件", "", "Web Files (*.php *.jsp *.asp)")
+        if file_path:
+            self.webshell_files = [file_path]
+            self.label_scan_path.setText(f"已选文件: {os.path.basename(file_path)}")
+
+    def choose_webshell_dir(self):
+        directory = QFileDialog.getExistingDirectory(self, "选择扫描目录")
+        if directory:
+            self.label_scan_path.setText(f"已选目录: {directory}")
+            self.scan_webshell_files(directory)
+
+    def scan_webshell_files(self, directory):
+        exts = []
+        if self.check_php.isChecked(): exts.append('*.php')
+        if self.check_jsp.isChecked(): exts.append('*.jsp')
+        if self.check_asp.isChecked(): exts.append('*.asp')
+
+        self.webshell_files = []
+        for ext in exts:
+            self.webshell_files.extend(glob.glob(os.path.join(directory, '**', ext), recursive=True))
+        
+        self.webshell_progress.setMaximum(len(self.webshell_files))
+        self.show_status(f"发现 {len(self.webshell_files)} 个待检测文件", "#2ed573")
+
+    def start_webshell_scan(self):
+        if not hasattr(self, 'webshell_files') or not self.webshell_files:
+            self.show_status("请先选择文件或目录", "red")
+            return
+
+        self.btn_start_scan.setEnabled(False)
+        self.webshell_result.clear()
+        self.webshell_progress.setValue(0)
+
+        self.batch_webshell_thread = BatchWebShellAnalysisThread(self.webshell_files)
+        self.batch_webshell_thread.progress_updated.connect(self.update_webshell_progress)
+        self.batch_webshell_thread.scan_complete.connect(self.webshell_scan_complete)
+        self.batch_webshell_thread.start()
+
+    def update_webshell_progress(self, percent, status, result):
+        self.webshell_progress.setValue(percent)
+        self.show_status(status, "#2ed573" if "安全" in status else "#ff4757")
+        self.webshell_result.insertPlainText(result)
+        self.webshell_result.ensureCursorVisible()
+
+    def webshell_scan_complete(self):
+        self.btn_start_scan.setEnabled(True)
+        self.show_status("批量检测完成", "#2ed573")
+        self.webshell_progress.setValue(100)
+
+
 if __name__ == '__main__':
     if os.name == 'nt':
         print("当前系统是 Windows")
